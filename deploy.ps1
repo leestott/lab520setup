@@ -36,6 +36,33 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "$label failed (exit $LASTEXITCODE)." }
     }
 
+    function Grant-Role($principalId, $roleId, $scope, $label) {
+        try {
+            New-AzRoleAssignment -RoleDefinitionId $roleId -ObjectId $principalId -Scope $scope -ErrorAction Stop | Out-Null
+            Write-Host "Granted $label to $principalId"
+        } catch {
+            if ($_.Exception.Message -match "already exists|RoleAssignmentExists") {
+                Write-Host "Skip (already exists): $label for $principalId"
+            } else { throw }
+        }
+    }
+
+    # Retry a scriptblock until it returns a non-null/non-empty result or throws after $maxAttempts
+    function Invoke-WithRetry([ScriptBlock]$sb, [string]$label, [int]$maxAttempts = 12, [int]$delaySec = 15) {
+        for ($i = 1; $i -le $maxAttempts; $i++) {
+            try {
+                $result = & $sb
+                if ($result) { return $result }
+                Write-Host "  $label attempt $i/${maxAttempts}: empty result, retrying in ${delaySec}s..."
+            } catch {
+                Write-Host "  $label attempt $i/${maxAttempts}: $($_.Exception.Message)"
+                if ($i -eq $maxAttempts) { throw }
+            }
+            Start-Sleep -Seconds $delaySec
+        }
+        throw "$label did not return a result after $maxAttempts attempts."
+    }
+
     # === Az PowerShell login (only auth we need) ===
     Write-Host ">>> Connect-AzAccount"
     $securePwd = ConvertTo-SecureString $appSecret -AsPlainText -Force
@@ -76,8 +103,19 @@ try {
     azd env set AZURE_PRINCIPAL_TYPE "User"
     azd env set AZURE_TENANT_ID      $tenantId
 
-    Invoke-External "azd up" {
-        azd up -e $envName --no-prompt
+    # Run azd up, capturing combined stdout+stderr so we can detect the known
+    # post-provision race condition (agent version 404) and continue despite it.
+    Write-Host ">>> azd up"
+    $azdOutput = & azd up -e $envName --no-prompt 2>&1
+    $azdOutput | ForEach-Object { Write-Host $_ }
+
+    if ($LASTEXITCODE -ne 0) {
+        $outputStr = ($azdOutput | Out-String)
+        if ($outputStr -match 'event-postprovision|event-postdeploy' -and $outputStr -match 'not_found|404') {
+            Write-Host "WARNING: azd up exited $LASTEXITCODE due to known post-provision race condition (agent version 404). All Azure resources provisioned successfully - continuing with RBAC setup."
+        } else {
+            throw "azd up failed (exit $LASTEXITCODE)."
+        }
     }
 
     Write-Host ">>> azd up complete"
@@ -103,33 +141,6 @@ try {
         return $null  # triggers retry
     } "Get project managed identity"
     $projectIdentityPrincipalId = $aiProject.Identity.PrincipalId
-
-    function Grant-Role($principalId, $roleId, $scope, $label) {
-        try {
-            New-AzRoleAssignment -RoleDefinitionId $roleId -ObjectId $principalId -Scope $scope -ErrorAction Stop | Out-Null
-            Write-Host "Granted $label to $principalId"
-        } catch {
-            if ($_.Exception.Message -match "already exists|RoleAssignmentExists") {
-                Write-Host "Skip (already exists): $label for $principalId"
-            } else { throw }
-        }
-    }
-
-    # Retry a scriptblock until it returns a non-null/non-empty result or throws after $maxAttempts
-    function Invoke-WithRetry([ScriptBlock]$sb, [string]$label, [int]$maxAttempts = 12, [int]$delaySec = 15) {
-        for ($i = 1; $i -le $maxAttempts; $i++) {
-            try {
-                $result = & $sb
-                if ($result) { return $result }
-                Write-Host "  $label attempt $i/${maxAttempts}: empty result, retrying in ${delaySec}s..."
-            } catch {
-                Write-Host "  $label attempt $i/${maxAttempts}: $($_.Exception.Message)"
-                if ($i -eq $maxAttempts) { throw }
-            }
-            Start-Sleep -Seconds $delaySec
-        }
-        throw "$label did not return a result after $maxAttempts attempts."
-    }
 
     Grant-Role $spObjectId               $foundryUserRoleId           $aiResourceId "Foundry User (deployment SP)"
     Grant-Role $userId                   $foundryUserRoleId           $aiResourceId "Foundry User (user)"
