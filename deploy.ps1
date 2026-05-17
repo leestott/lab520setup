@@ -41,7 +41,7 @@ try {
             New-AzRoleAssignment -RoleDefinitionId $roleId -ObjectId $principalId -Scope $scope -ErrorAction Stop | Out-Null
             Write-Host "Granted $label to $principalId"
         } catch {
-            if ($_.Exception.Message -match "already exists|RoleAssignmentExists") {
+            if ($_.Exception.Message -match "already exists|RoleAssignmentExists|Conflict") {
                 Write-Host "Skip (already exists): $label for $principalId"
             } else { throw }
         }
