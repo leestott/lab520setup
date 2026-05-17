@@ -38,6 +38,7 @@ It includes execution order, configuration details, logging behavior, and setup 
   - Authenticates with Azure CLI (`az login`) so that `azd` receives proper credentials.
   - Authenticates `azd` directly with the same service principal to avoid interactive auth waits.
   - Ensures `azd` is available in PATH and retries `azd version` until successful.
+  - Changes directory to `C:\Users\LabUser\Desktop\Build26-LAB520-main` before running `azd up` (fails early if folder is missing).
   - Executes `azd up --no-prompt`, writing output to log.
   - Does **not** include any RBAC assignments to avoid duplication and race conditions.
 - **Setup Instructions**:
@@ -98,7 +99,7 @@ It includes execution order, configuration details, logging behavior, and setup 
 | Script                      | Timeout    | Blocking | Delay    |
 |----------------------------|------------|----------|----------|
 | azd_install.ps1            | 15 minutes | Yes      | N/A      |
-| azd_deployment.ps1         | 45 minutes | Yes      | N/A      |
+| azd_deployment.ps1         | 75 minutes | Yes      | N/A      |
 | rbac_bootstrap.ps1         | 15 minutes | Yes      | N/A      |
 | hosted_agent_fix.ps1       | 10 minutes | No       | 420 sec  |
 
