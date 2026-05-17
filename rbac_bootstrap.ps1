@@ -2,6 +2,28 @@ $ErrorActionPreference = "Stop"
 
 function Log($m){ Write-Output "$(Get-Date -Format o) $m" }
 
+function Connect-LabAzAccount {
+    $clientId     = "@lab.CloudSubscription.AppId"
+    $clientSecret = "@lab.CloudSubscription.AppSecret"
+    $tenantId     = "@lab.CloudSubscription.TenantId"
+    $subscription = "@lab.CloudSubscription.Id"
+
+    Log "Logging into Az PowerShell"
+
+    $secureSecret = ConvertTo-SecureString $clientSecret -AsPlainText -Force
+    $credential = New-Object System.Management.Automation.PSCredential($clientId, $secureSecret)
+
+    Connect-AzAccount `
+        -ServicePrincipal `
+        -Credential $credential `
+        -Tenant $tenantId `
+        -Subscription $subscription | Out-Null
+
+    Set-AzContext -Subscription $subscription -Tenant $tenantId | Out-Null
+
+    Log "Az PowerShell context set to $subscription"
+}
+
 function Retry($script, $desc){
     for($i = 1; $i -le 20; $i++){
         try {
@@ -17,6 +39,8 @@ function Retry($script, $desc){
 
 try {
     Log "Starting RBAC configuration"
+
+    Connect-LabAzAccount
 
     $userUpn = "@lab.CloudPortalCredential(User1).Username"
 

@@ -30,17 +30,18 @@ It includes execution order, configuration details, logging behavior, and setup 
 - **Purpose**: Authenticates using Azure CLI with service principal credentials and runs `azd up` to deploy Bicep/ARM resources.
 - **Configuration**:
   - Blocking: **Yes**
-  - Timeout: **45 minutes**
+  - Timeout: **75 minutes**
 - **Logging**:
   - Desktop log file: `azd-deployment.log` (fallback to `%TEMP%` if Desktop is unavailable)
   - Uses `Start-Transcript` and a custom `Log` function.
 - **Features**:
   - Authenticates with Azure CLI (`az login`) so that `azd` receives proper credentials.
+  - Authenticates `azd` directly with the same service principal to avoid interactive auth waits.
   - Ensures `azd` is available in PATH and retries `azd version` until successful.
   - Executes `azd up --no-prompt`, writing output to log.
   - Does **not** include any RBAC assignments to avoid duplication and race conditions.
 - **Setup Instructions**:
-  1. Configure as a Blocking VM script with a 45-minute timeout.
+  1. Configure as a Blocking VM script with a 75-minute timeout.
   2. Ensure the AZ CLI and credentials environment are present.
   3. The script handles Azure CLI login and deployment.
 
@@ -52,6 +53,7 @@ It includes execution order, configuration details, logging behavior, and setup 
 - **Logging**:
   - Writes to standard output for lifecycle logs.
 - **Features**:
+  - Authenticates to Az PowerShell with `Connect-AzAccount` using the lab service principal.
   - Uses Az PowerShell cmdlets to retrieve the Foundry Cognitive Services account and project identity.
   - Retry loops are used for resolved resources with logging of attempts.
   - Applies role assignments:
