@@ -124,8 +124,12 @@ try {
     $foundryUserRoleId           = "53ca6127-db72-4b80-b1b0-d745d6d5456d"  # Foundry User
     $foundryProjectManagerRoleId = "eadc314b-1a2d-4efa-be10-5d325db5065e"  # Foundry Project Manager
 
+    # azd provisions into a new resource group named rg-{envName}, not the pre-existing lab RG
+    $azdRg = "rg-$envName"
+    Write-Host "azd resource group: $azdRg"
+
     $aiResource = Invoke-WithRetry {
-        Get-AzCognitiveServicesAccount -ResourceGroupName $rg -ErrorAction Stop | Select-Object -First 1
+        Get-AzCognitiveServicesAccount -ResourceGroupName $azdRg -ErrorAction Stop | Select-Object -First 1
     } "Get Foundry account"
     if (-not $aiResource) { throw "No Foundry account found in RG '$rg'." }
     $aiResourceId = $aiResource.Id
@@ -135,7 +139,7 @@ try {
     $aiProject = Invoke-WithRetry {
         $proj = Get-AzResource `
             -ResourceType "Microsoft.CognitiveServices/accounts/projects" `
-            -ResourceGroupName $rg `
+            -ResourceGroupName $azdRg `
             -ExpandProperties -ErrorAction Stop | Select-Object -First 1
         if ($proj -and $proj.Identity.PrincipalId) { return $proj }
         return $null  # triggers retry
